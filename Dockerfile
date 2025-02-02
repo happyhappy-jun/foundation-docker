@@ -15,13 +15,8 @@ RUN apt-get update && apt-get install -y \
     vim \
     tmux \
     sudo \
+    python3-yaml \
     && rm -rf /var/lib/apt/lists/*
-
-# Create and set permissions for entrypoint script
-RUN echo '#!/bin/zsh\n\
-export HOSTNAME=$(curl -s ifconfig.me)\n\
-exec "$@"' > /entrypoint.sh && \
-    chmod +x /entrypoint.sh
 
 # Install Miniconda
 RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh \
@@ -30,6 +25,21 @@ RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -
 
 # Add conda to path
 ENV PATH=/opt/conda/bin:$PATH
+
+# Create and set permissions for entrypoint script
+RUN echo '#!/bin/zsh\n\
+export HOSTNAME=$(curl -s ifconfig.me)\n\
+if [ -f "/root/.secrets/base_credentials.yml" ]; then\n\
+    eval "$(python3 -c "\
+import yaml;\
+with open(\"/root/.secrets/base_credentials.yml\") as f:\
+    s=yaml.safe_load(f);\
+print(\\"\\n\\".join([f\\"export {k.upper()}={v}\\" for k,v in s.items()]))\
+    ")"\n\
+    echo "Loaded base credentials"\n\
+fi\n\
+exec "$@"' > /entrypoint.sh && \
+    chmod +x /entrypoint.sh
 
 # Install Oh My Zsh
 RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
